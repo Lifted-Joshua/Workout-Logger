@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "/+ySQ0dBIwM=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Lifted.Joshua\\OneDrive - AddSecure\\Desktop\\C# Academy Projects\\MinimalApis\\WorkoutLogger\\WorkoutLogger.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Lifted.Joshua\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.8\\microsoft.entityframeworkcore.10.0.8.nupkg.sha512",
+    "C:\\Users\\Lifted.Joshua\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.8\\microsoft.entityframeworkcore.abstractions.10.0.8.nupkg.sha512",
+    "C:\\Users\\Lifted.Joshua\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.8\\microsoft.entityframeworkcore.analyzers.10.0.8.nupkg.sha512",
+    "C:\\Users\\Lifted.Joshua\\.nuget\\packages\\microsoft.entityframeworkcore.inmemory\\10.0.8\\microsoft.entityframeworkcore.inmemory.10.0.8.nupkg.sha512"
+  ],
+  "logs": []
+}
