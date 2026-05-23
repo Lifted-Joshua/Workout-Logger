@@ -4,7 +4,7 @@ namespace WorkoutLogger.Models;
 public class Workout
 {
     public int Id { get; set; }
-    public WorkoutDay CurrentDay { get; set; }
-    public DateTimeOffset DateTime { get; set; }
+    public required WorkoutDay CurrentDay { get; set; }
+    public required DateTimeOffset DateTime { get; set; }
     public string? Notes { get; set; }
 }

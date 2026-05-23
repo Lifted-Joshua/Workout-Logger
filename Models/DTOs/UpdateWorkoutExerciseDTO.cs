@@ -7,7 +7,7 @@ namespace WorkoutLogger.Models.DTOs;
 
 public class UpdateWorkoutExerciseDto
 {
-    public int Sets { get; set; }
-    public int Reps { get; set; }
-    public double WeightKg { get; set; }
+    public required int Sets { get; set; }
+    public required int Reps { get; set; }
+    public required double WeightKg { get; set; }
 }

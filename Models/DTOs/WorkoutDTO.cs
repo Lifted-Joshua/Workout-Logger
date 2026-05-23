@@ -11,7 +11,7 @@ namespace WorkoutLogger.Models.DTOs;
 /// </summary>
 public class WorkoutDto
 {
-    public WorkoutDay CurrentDay { get; set; }
-    public DateTimeOffset DateTime { get; set; }
+    public required WorkoutDay CurrentDay { get; set; }
+    public required DateTimeOffset DateTime { get; set; }
     public string? Notes { get; set; }
 }

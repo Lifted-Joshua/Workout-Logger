@@ -7,15 +7,11 @@ using WorkoutLogger.Enums;
 namespace WorkoutLogger.Models.DTOs;
 public class WorkoutWithExerciseDto
 {
-    public WorkoutDay Day { get; set; }
-    public DateTimeOffset DateTime { get; set; }
-    public List<ExerciseDTO> Exercises { get; set; }
+    public required WorkoutDay Day { get; init; }
+    public required DateTimeOffset DateTime { get; init; }
+    public string? Notes { get; init; }
+    public required List<ExerciseDTO> Exercises { get; init; }
 
-    public WorkoutWithExerciseDto(WorkoutDay day, DateTimeOffset dateTime, List<ExerciseDTO> exercises)
-    {
-        this.Day = day;
-        this.DateTime = dateTime;
-        this.Exercises = exercises;
-    }
+
 
 }

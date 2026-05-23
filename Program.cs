@@ -1,3 +1,4 @@
+using System.Reflection.Metadata.Ecma335;
 using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
@@ -15,8 +16,11 @@ var workouts = app.MapGroup("/workouts");
 // Creation of Routes and method for /workouts
 // Gets all Workouts
 workouts.MapGet("/", GetWorkouts);
-// Gets a specific workout by id
+
+// Gets a specific workout and it's exercises by id
 workouts.MapGet("/{id}", GetWorkoutsById);
+// Updates a specific workout
+workouts.MapPut("/{id}", UpdateWorkoutById);
 // Creates a workout
 workouts.MapPost("/", CreateWorkout);
 // Deletes a workout by id
@@ -49,7 +53,6 @@ var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
         return await next(context);
     });
 
-app.MapGet("workouts/{id}/", GetAllExercisesAndWorkout);
 
 //Gets all exercises for a workout
 workoutExercises.MapGet("/", GetAllExercisesForWorkout);
@@ -71,10 +74,77 @@ static async Task<IResult> GetWorkouts(WorkoutsDb db)
 
 static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 {
-    return await db.Workouts.FindAsync(id)
-        is Workout workout
-            ? TypedResults.Ok(workout)
-            : TypedResults.NotFound();
+    List<ExerciseDTO> exercises = new List<ExerciseDTO>();
+
+    // Check if the passed in id(workoutId) exists in the Workouts db
+    var workoutIdExists = await db.Workouts.AnyAsync(x => x.Id == id);
+    if(!workoutIdExists) return TypedResults.NotFound();
+
+    var workout = await db.Workouts.FindAsync(id);
+
+    if(workout is null) return TypedResults.NotFound();
+
+    // If the workout exists in the workouts database get the exercises for it
+    // Find the item in the database with the Id - if it is not null do mapping, else return NotFound()
+    // Step 1: Get all ExerciseIds that belong to the given WorkoutId and return it as a list
+    var exerciseIds = await db.WorkoutExercises.Where(x => x.WorkoutId == id).Select(x => x.ExerciseId).ToListAsync();
+
+    // Step 2: Use the list of ExerciseIds to get the matching Exercise records
+    // Filters WorkoutExercises table/dbSet where the Id exists in the list of exerciseId's that belong so a specific workoutId
+    var getWorkoutExercises = await db.WorkoutExercises.Where(x => exerciseIds.Contains(x.ExerciseId)).ToListAsync();
+
+    // Get the exercises from Exercise table where the Id matches the exercisesId's list that stores the Id's belonging to the workout passed in
+    var getExercises = await db.Exercises.Where(x => exerciseIds.Contains(x.Id)).ToListAsync();
+
+
+    foreach(var exercise in getWorkoutExercises)
+    {
+        var name = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.Name).Single();
+        var muscleGroup = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.MuscleGroup).Single();
+
+        exercises.Add(new ExerciseDTO
+        {
+            Name = name,
+            MuscleGroup = muscleGroup,
+            Sets = exercise.Sets,
+            Reps = exercise.Reps,
+            WeightKg = exercise.WeightKg,
+        });
+    }
+
+    var workoutWithExercises = new WorkoutWithExerciseDto
+    {
+        Day = workout.CurrentDay,
+        DateTime = workout.DateTime,
+        Notes = workout.Notes,
+        Exercises = exercises
+    };
+
+    return TypedResults.Ok(workoutWithExercises);
+
+}
+
+static async Task<IResult> UpdateWorkoutById(int id, WorkoutDto workoutDto, WorkoutsDb db)
+{
+    // Check if workoutDto is null
+    if(workoutDto is null) return TypedResults.BadRequest("workout is null");
+
+    // Check if passed in Id exists in workouts database
+    var workout = await db.Workouts.FindAsync(id);
+
+    if(workout != null)
+    {
+        workout.CurrentDay = workoutDto.CurrentDay;
+        workout.DateTime = workoutDto.DateTime;
+        workout.Notes = workoutDto.Notes ?? string.Empty;
+        await db.SaveChangesAsync();
+        return TypedResults.Created($"workouts/{workout.Id}", workout);
+
+    } else {
+        return Results.BadRequest("WorkoutId does not exist");
+    }
+
+
 }
 
 static async Task<IResult> CreateWorkout(WorkoutDto workoutDTO, WorkoutsDb db)
@@ -85,7 +155,7 @@ static async Task<IResult> CreateWorkout(WorkoutDto workoutDTO, WorkoutsDb db)
     {
         CurrentDay = workoutDTO.CurrentDay,
         DateTime = workoutDTO.DateTime,
-        Notes = workoutDTO.Notes,
+        Notes = workoutDTO.Notes ?? string.Empty,
     };
 
     db.Workouts.Add(workout);
@@ -163,36 +233,7 @@ static async Task<IResult> DeleteExercise(int id, WorkoutsDb db)
     return TypedResults.NotFound();
 }
 
-static async Task<IResult> GetAllExercisesAndWorkout(int id, WorkoutsDb db)
-{
-    List<ExerciseDTO> exercises = new List<ExerciseDTO>();
 
-    // Find the item in the database with the Id - if it is not null do mapping, else return NotFound()
-    // Step 1: Get all ExerciseIds that belong to the given WorkoutId
-    // This queries the WorkoutExercises table and extracts only the ExerciseId values
-    var exerciseId = await db.WorkoutExercises.Where(x => x.WorkoutId == id).Select(x => x.ExerciseId).ToListAsync();
-
-    if(exerciseId is null) return TypedResults.NotFound();
-
-    var day = await db.Workouts.Where(x => x.Id == id).Select(x => x.CurrentDay).SingleAsync();
-    var dateTime = await db.Workouts.Where(x => x.Id == id).Select(x => x.DateTime).SingleAsync();
-
-    // Step 2: Use the list of ExerciseIds to get the matching Exercise records
-    // Filters Exercises where the Id exists in the list collected above
-    var getExercises = await db.Exercises.Where(x => exerciseId.Contains(x.Id)).ToListAsync();
-
-    if(getExercises is null) return TypedResults.NotFound();
-
-    foreach(var excercise in getExercises)
-    {
-        exercises.Add(new ExerciseDTO(excercise));
-    }
-
-    var workoutWithExercises = new WorkoutWithExerciseDto(day, dateTime, exercises);
-
-    return TypedResults.Ok(workoutWithExercises);
-
-}
 
 static async Task<IResult> GetAllExercisesForWorkout(int id, WorkoutsDb db)
 {
@@ -213,9 +254,17 @@ static async Task<IResult> AddExerciseForWokout(int Id, WorkoutExerciseDto worko
 {
     if(workoutExerciseDTO is null) return TypedResults.BadRequest();
 
+    // Checking if workoutId & exerciseId exists already as a combination within WorkoutExercise table
+    var doesWorkoutExercisseExists = await db.WorkoutExercises.Where(x => x.WorkoutId == Id && x.ExerciseId == workoutExerciseDTO.ExerciseId).AnyAsync();
+
+    if(doesWorkoutExercisseExists) return TypedResults.BadRequest();
+
+    //Check if Id passed in for WorkoutId exists in Workouts database
     var workoutIdIsValid = await db.Workouts.FindAsync(Id);
+    // Checking if Exercise ID in dto exists in Exercise database
     var exerciseIdIsValid = await db.Exercises.FindAsync(workoutExerciseDTO.ExerciseId);
 
+    // If workoutId or exerciseId does not exist in their retrospective databases, return
     if(workoutIdIsValid is null || exerciseIdIsValid is null) return TypedResults.NotFound();
 
     var workoutExercise = new WorkoutExercise
@@ -235,11 +284,11 @@ static async Task<IResult> AddExerciseForWokout(int Id, WorkoutExerciseDto worko
 
 static async Task<IResult> UpdateWorkoutExercise(int Id, int exerciseId, UpdateWorkoutExerciseDto updateWorkoutExerciseDTO, WorkoutsDb db)
 {
-    if(updateWorkoutExerciseDTO is null) return Results.BadRequest();
+    if(updateWorkoutExerciseDTO is null) return TypedResults.BadRequest();
 
     var workoutExerciseToUpdate = await db.WorkoutExercises.FirstOrDefaultAsync(x => x.WorkoutId == Id && x.ExerciseId == exerciseId);
 
-    if(workoutExerciseToUpdate is null) return Results.NotFound();
+    if(workoutExerciseToUpdate is null) return TypedResults.NotFound();
 
     workoutExerciseToUpdate.Sets = updateWorkoutExerciseDTO.Sets;
     workoutExerciseToUpdate.Reps = updateWorkoutExerciseDTO.Reps;
@@ -252,7 +301,7 @@ static async Task<IResult> UpdateWorkoutExercise(int Id, int exerciseId, UpdateW
 static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, WorkoutsDb db)
 {
     var exerciseToDelete = await db.WorkoutExercises.FirstOrDefaultAsync(x => x.WorkoutId == Id && x.ExerciseId == exerciseId);
-    if(exerciseToDelete is null) return Results.NotFound();
+    if(exerciseToDelete is null) return TypedResults.NotFound();
 
     db.WorkoutExercises.Remove(exerciseToDelete);
     await db.SaveChangesAsync();

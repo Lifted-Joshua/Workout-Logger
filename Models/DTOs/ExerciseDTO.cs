@@ -6,12 +6,10 @@ using System.Threading.Tasks;
 namespace WorkoutLogger.Models.DTOs;
 public class ExerciseDTO
 {
-    public string Name { get; set; } = string.Empty;
-    public string MuscleGroup { get; set; } = string.Empty;
+    public required string Name { get; set; }
+    public required string MuscleGroup { get; set; }
+    public required int Sets { get; set; }
+    public required int Reps { get; set; }
+    public required double WeightKg { get; set; }
 
-    public ExerciseDTO(Exercise exercise)
-    {
-        this.Name = exercise.Name;
-        this.MuscleGroup = exercise.MuscleGroup;
-    }
 }
