@@ -1,43 +1,27 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<WorkoutsDb>(options => options.UseInMemoryDatabase("Workout Database"));
-
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+// Dependency Inject the Validation Enpoints Filter method
+// - typeOf allows DI to resolve the type without registering each one individually
+builder.Services.AddScoped(typeof(ValidationEndPointFilter<>));
 
 
 var app = builder.Build();
 
 var workouts = app.MapGroup("/workouts");
-
-// Creation of Routes and method for /workouts
-// Gets all Workouts
-workouts.MapGet("/", GetWorkouts);
-
-// Gets a specific workout and it's exercises by id
-workouts.MapGet("/{id}", GetWorkoutsById);
-// Updates a specific workout
-workouts.MapPut("/{id}", UpdateWorkoutById);
-// Creates a workout
-workouts.MapPost("/", CreateWorkout);
-// Deletes a workout by id
-workouts.MapDelete("/{id}", DeleteWorkoutById);
-
-
-//Creation of Routes and methods for /exercises
+var workoutsId = app.MapGroup("/workouts/{id}");
 var exercises = app.MapGroup("/exercises");
-// Get all Exercises
-exercises.MapGet("/", GetExercises);
-
-// Add a new exercise
-exercises.MapPost("/", AddExcercise);
-
-// Delete an exercise by id
-exercises.MapDelete("/{id}", DeleteExercise);
-
-
 //Creation of Routes and methods for /WorkoutExercises
 var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
     .AddEndpointFilter(async (context, next) =>
@@ -53,17 +37,49 @@ var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
     });
 
 
+// Creation of Routes and method for /workouts
+// Gets all Workouts
+workouts.MapGet("/", GetWorkouts);
+// Gets a specific workout and it's exercises by id
+workoutsId.MapGet("/", GetWorkoutsById);
+
+// Updates a specific workout (pass in id of workout to update)
+// Calling validationEndpointFilter to validate the model passed in (its data annotations) before the handler is called
+workoutsId.MapPut("/", UpdateWorkoutById)
+    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>();
+// Creates a workout
+workouts.MapPost("/", CreateWorkout)
+    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>();
+// Deletes a workout by id (pass in id of workout to delete)
+workoutsId.MapDelete("/", DeleteWorkoutById);
+
+
+// Get all Exercises
+exercises.MapGet("/", GetExercises);
+
+// Add a new exercise
+exercises.MapPost("/", AddExcercise)
+    .AddEndpointFilter<ValidationEndPointFilter<ExerciseDto>>();
+
+exercises.MapPost("/bulk", AddExercises)
+    .AddEndpointFilter<ValidationEndPointFilter<ExerciseDto>>();
+
+// Delete an exercise by id
+exercises.MapDelete("/{id}", DeleteExercise);
+
+
 //Gets all exercises for a workout
 workoutExercises.MapGet("/", GetAllExercisesForWorkout);
-
 // Creates and adds an exercise to a workout
-workoutExercises.MapPost("/", AddExerciseForWokout);
-
+workoutExercises.MapPost("/", AddExerciseForWokout)
+    .AddEndpointFilter<ValidationEndPointFilter<WorkoutExerciseDto>>();
 // Updates an exercise under a workout
-workoutExercises.MapPatch("/{exerciseId}", UpdateWorkoutExercise);
-
+workoutExercises.MapPatch("/{exerciseId}", UpdateWorkoutExercise)
+    .AddEndpointFilter<ValidationEndPointFilter<UpdateWorkoutExerciseDto>>();
 // Deletes an exercise from a workout
 workoutExercises.MapDelete("/{exerciseId}", DeleteExerciseFromWorkout);
+
+
 
 
 static async Task<IResult> GetWorkouts(WorkoutsDb db)
@@ -73,7 +89,7 @@ static async Task<IResult> GetWorkouts(WorkoutsDb db)
 
 static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 {
-    List<ExerciseDto> exercises = new List<ExerciseDto>();
+    List<WorkoutExerciseDetailDto> exercises = new List<WorkoutExerciseDetailDto>();
 
     // Check if the passed in id(workoutId) exists in the Workouts db
     var workout = await db.Workouts.FindAsync(id);
@@ -99,7 +115,7 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
         var name = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.Name).Single();
         var muscleGroup = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.MuscleGroup).Single();
 
-        exercises.Add(new ExerciseDto
+        exercises.Add(new WorkoutExerciseDetailDto
         {
             Name = name,
             MuscleGroup = muscleGroup,
@@ -140,9 +156,8 @@ static async Task<IResult> UpdateWorkoutById(int id, WorkoutDto workoutDto, Work
     } else {
         return TypedResults.BadRequest("WorkoutId does not exist");
     }
-
-
 }
+
 
 static async Task<IResult> CreateWorkout(WorkoutDto workoutDTO, WorkoutsDb db)
 {
@@ -188,7 +203,7 @@ static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
     if(exerciseDTO is null) return TypedResults.BadRequest();
 
     //Check if fields is empty, null or whitespace
-    if(string.IsNullOrWhiteSpace(exerciseDTO.Name) && string.IsNullOrWhiteSpace(exerciseDTO.MuscleGroup))
+    if(string.IsNullOrWhiteSpace(exerciseDTO.Name) || string.IsNullOrWhiteSpace(exerciseDTO.MuscleGroup))
     {
         return TypedResults.BadRequest();
     }
@@ -208,8 +223,24 @@ static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
     await db.SaveChangesAsync();
 
     // Return 201 status code and message stating excercise id created
-    return TypedResults.Created($"excercises/{exercise.Id}", exercise.Id);
+    return TypedResults.Created($"exercises/{exercise.Id}", exercise.Id);
 }
+
+static async Task<IResult> AddExercises(List<ExerciseDto> exerciseDtos, WorkoutsDb db)
+{
+    if(exerciseDtos.Count == 0) return TypedResults.BadRequest("Empty Json data");
+
+    var workouts = exerciseDtos.Select(dto => new Exercise
+    {
+        Name = dto.Name,
+        MuscleGroup = dto.MuscleGroup
+    }).ToList();
+
+    db.Exercises.AddRange(workouts);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(workouts);
+};
 
 static async Task<IResult> DeleteExercise(int id, WorkoutsDb db)
 {

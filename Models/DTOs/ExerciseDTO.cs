@@ -1,15 +1,11 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace WorkoutLogger.Models.DTOs;
 public class ExerciseDto
 {
+    [Required, MinLength(1)]
     public required string Name { get; set; }
+    [Required, MinLength(1)]
     public required string MuscleGroup { get; set; }
-    public required int Sets { get; set; }
-    public required int Reps { get; set; }
-    public required double WeightKg { get; set; }
-
 }

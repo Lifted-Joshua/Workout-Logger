@@ -31,3 +31,4 @@ C:\Users\Lifted.Joshua\OneDrive - AddSecure\Desktop\C# Academy Projects\MinimalA
 C:\Users\Lifted.Joshua\OneDrive - AddSecure\Desktop\C# Academy Projects\MinimalApis\WorkoutLogger\obj\Debug\net10.0\WorkoutLogger.genruntimeconfig.cache
 C:\Users\Lifted.Joshua\OneDrive - AddSecure\Desktop\C# Academy Projects\MinimalApis\WorkoutLogger\obj\Debug\net10.0\ref\WorkoutLogger.dll
 C:\Users\Lifted.Joshua\OneDrive - AddSecure\Desktop\C# Academy Projects\MinimalApis\WorkoutLogger\bin\Debug\net10.0\Microsoft.EntityFrameworkCore.InMemory.dll
+C:\Users\Lifted.Joshua\OneDrive - AddSecure\Desktop\C# Academy Projects\MinimalApis\WorkoutLogger\obj\Debug\net10.0\WorkoutLogger.sourcelink.json

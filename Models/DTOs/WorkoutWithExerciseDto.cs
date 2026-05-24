@@ -10,8 +10,5 @@ public class WorkoutWithExerciseDto
     public required WorkoutDay Day { get; init; }
     public required DateTimeOffset DateTime { get; init; }
     public string? Notes { get; init; }
-    public required List<ExerciseDto> Exercises { get; init; }
-
-
-
+    public required List<WorkoutExerciseDetailDto> Exercises { get; init; }
 }

@@ -5,14 +5,15 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace WorkoutLogger.Models.DTOs;
-public class WorkoutExerciseDto
+/// <summary>
+/// Output/ Response Dto
+/// </summary>
+public class WorkoutExerciseDetailDto
 {
-    [Required, MinLength(1)]
-    public required int ExerciseId { get; set; }
-    [Required, MinLength(1)]
+    public required string Name { get; set; }
+    public required string MuscleGroup { get; set; }
     public required int Sets { get; set; }
-    [Required, MinLength(1)]
     public required int Reps { get; set; }
-    [Required, MinLength(1)]
     public required double WeightKg { get; set; }
+
 }
