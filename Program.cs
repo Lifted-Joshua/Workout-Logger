@@ -1,4 +1,3 @@
-using System.Reflection.Metadata.Ecma335;
 using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
@@ -74,12 +73,9 @@ static async Task<IResult> GetWorkouts(WorkoutsDb db)
 
 static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 {
-    List<ExerciseDTO> exercises = new List<ExerciseDTO>();
+    List<ExerciseDto> exercises = new List<ExerciseDto>();
 
     // Check if the passed in id(workoutId) exists in the Workouts db
-    var workoutIdExists = await db.Workouts.AnyAsync(x => x.Id == id);
-    if(!workoutIdExists) return TypedResults.NotFound();
-
     var workout = await db.Workouts.FindAsync(id);
 
     if(workout is null) return TypedResults.NotFound();
@@ -90,8 +86,9 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
     var exerciseIds = await db.WorkoutExercises.Where(x => x.WorkoutId == id).Select(x => x.ExerciseId).ToListAsync();
 
     // Step 2: Use the list of ExerciseIds to get the matching Exercise records
-    // Filters WorkoutExercises table/dbSet where the Id exists in the list of exerciseId's that belong so a specific workoutId
-    var getWorkoutExercises = await db.WorkoutExercises.Where(x => exerciseIds.Contains(x.ExerciseId)).ToListAsync();
+    // Filters WorkoutExercises table/dbSet where the workoutExercise's ExerciseId exists in the list of exerciseId's
+    // (the exeriseId's list is a list storing all the ExerciseId's that belong to a specific workout)
+    var getWorkoutExercises = await db.WorkoutExercises.Where(x => exerciseIds.Contains(x.ExerciseId) && x.WorkoutId == id).ToListAsync();
 
     // Get the exercises from Exercise table where the Id matches the exercisesId's list that stores the Id's belonging to the workout passed in
     var getExercises = await db.Exercises.Where(x => exerciseIds.Contains(x.Id)).ToListAsync();
@@ -102,7 +99,7 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
         var name = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.Name).Single();
         var muscleGroup = getExercises.Where(x => x.Id == exercise.ExerciseId).Select(x => x.MuscleGroup).Single();
 
-        exercises.Add(new ExerciseDTO
+        exercises.Add(new ExerciseDto
         {
             Name = name,
             MuscleGroup = muscleGroup,
@@ -138,10 +135,10 @@ static async Task<IResult> UpdateWorkoutById(int id, WorkoutDto workoutDto, Work
         workout.DateTime = workoutDto.DateTime;
         workout.Notes = workoutDto.Notes ?? string.Empty;
         await db.SaveChangesAsync();
-        return TypedResults.Created($"workouts/{workout.Id}", workout);
+        return TypedResults.NoContent();
 
     } else {
-        return Results.BadRequest("WorkoutId does not exist");
+        return TypedResults.BadRequest("WorkoutId does not exist");
     }
 
 
@@ -185,7 +182,7 @@ static async Task<IResult> GetExercises(WorkoutsDb db)
     return TypedResults.Ok(exercises);
 }
 
-static async Task<IResult> AddExcercise(ExerciseDTO exerciseDTO, WorkoutsDb db)
+static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
 {
     //Check if excercise passed in is null
     if(exerciseDTO is null) return TypedResults.BadRequest();
@@ -197,7 +194,7 @@ static async Task<IResult> AddExcercise(ExerciseDTO exerciseDTO, WorkoutsDb db)
     }
 
     // Check if the exercise already exists within the workout - prevent duplicate exercises
-    if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return Results.BadRequest();
+    if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return TypedResults.BadRequest();
 
     // Create new excercise model
     var exercise = new Exercise
@@ -245,7 +242,7 @@ static async Task<IResult> GetAllExercisesForWorkout(int id, WorkoutsDb db)
     // Filters Exercises where the Id exists in the list collected above
     var getExercises = await db.Exercises.Where(x => exerciseId.Contains(x.Id)).ToListAsync();
 
-    if(getExercises != null ) return TypedResults.Ok(getExercises);
+    if(getExercises.Count == 0) return TypedResults.Ok(getExercises);
 
     return TypedResults.NotFound();
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace WorkoutLogger.Models.DTOs;
-public class ExerciseDTO
+public class ExerciseDto
 {
     public required string Name { get; set; }
     public required string MuscleGroup { get; set; }
