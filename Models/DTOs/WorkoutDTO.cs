@@ -12,9 +12,10 @@ namespace WorkoutLogger.Models.DTOs;
 /// </summary>
 public class WorkoutDto
 {
-    [Required, MinLength(1)]
-    public required WorkoutDay CurrentDay { get; set; }
-    [Required, MinLength(1)]
-    public required DateTimeOffset DateTime { get; set; }
-    public string? Notes { get; set; }
+    [Required]
+    public WorkoutDay? CurrentDay { get; set; }
+    [Required]
+    public DateTimeOffset? DateTime { get; set; }
+    [MinLength(1)]
+    public required string Notes { get; set; }
 }

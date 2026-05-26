@@ -140,15 +140,15 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 static async Task<IResult> UpdateWorkoutById(int id, WorkoutDto workoutDto, WorkoutsDb db)
 {
     // Check if workoutDto is null
-    if(workoutDto is null) return TypedResults.BadRequest("workout is null");
+    // if(workoutDto is null) return TypedResults.BadRequest("workout is null");
 
     // Check if passed in Id exists in workouts database
     var workout = await db.Workouts.FindAsync(id);
 
     if(workout != null)
     {
-        workout.CurrentDay = workoutDto.CurrentDay;
-        workout.DateTime = workoutDto.DateTime;
+        workout.CurrentDay = workoutDto.CurrentDay!.Value;
+        workout.DateTime = workoutDto.DateTime!.Value;
         workout.Notes = workoutDto.Notes ?? string.Empty;
         await db.SaveChangesAsync();
         return TypedResults.NoContent();
@@ -161,12 +161,12 @@ static async Task<IResult> UpdateWorkoutById(int id, WorkoutDto workoutDto, Work
 
 static async Task<IResult> CreateWorkout(WorkoutDto workoutDTO, WorkoutsDb db)
 {
-    if(workoutDTO is null) return TypedResults.BadRequest();
+    // if(workoutDTO is null) return TypedResults.BadRequest();
 
     var workout = new Workout
     {
-        CurrentDay = workoutDTO.CurrentDay,
-        DateTime = workoutDTO.DateTime,
+        CurrentDay = workoutDTO.CurrentDay!.Value,
+        DateTime = workoutDTO.DateTime!.Value,
         Notes = workoutDTO.Notes ?? string.Empty,
     };
 
@@ -199,14 +199,14 @@ static async Task<IResult> GetExercises(WorkoutsDb db)
 
 static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
 {
-    //Check if excercise passed in is null
-    if(exerciseDTO is null) return TypedResults.BadRequest();
+    // //Check if excercise passed in is null
+    // if(exerciseDTO is null) return TypedResults.BadRequest();
 
-    //Check if fields is empty, null or whitespace
-    if(string.IsNullOrWhiteSpace(exerciseDTO.Name) || string.IsNullOrWhiteSpace(exerciseDTO.MuscleGroup))
-    {
-        return TypedResults.BadRequest();
-    }
+    // //Check if fields is empty, null or whitespace
+    // if(string.IsNullOrWhiteSpace(exerciseDTO.Name) || string.IsNullOrWhiteSpace(exerciseDTO.MuscleGroup))
+    // {
+    //     return TypedResults.BadRequest();
+    // }
 
     // Check if the exercise already exists within the workout - prevent duplicate exercises
     if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return TypedResults.BadRequest();
@@ -214,8 +214,8 @@ static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
     // Create new excercise model
     var exercise = new Exercise
     {
-        Name = exerciseDTO.Name,
-        MuscleGroup = exerciseDTO.MuscleGroup,
+        Name = exerciseDTO.Name!,
+        MuscleGroup = exerciseDTO.MuscleGroup!,
     };
 
     // Add new exercise model into the database and save changes
