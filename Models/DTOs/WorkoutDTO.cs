@@ -16,6 +16,6 @@ public class WorkoutDto
     public WorkoutDay? CurrentDay { get; set; }
     [Required]
     public DateTimeOffset? DateTime { get; set; }
-    [MinLength(1)]
-    public required string Notes { get; set; }
+    [Required, MinLength(1)]
+    public string? Notes { get; set; }
 }

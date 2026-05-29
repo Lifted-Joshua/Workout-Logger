@@ -1,20 +1,42 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
 
+// Loads default configurations
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<WorkoutsDb>(options => options.UseInMemoryDatabase("Workout Database"));
+
+builder.Services.AddDbContext<WorkoutsDb>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+    npgsqlOptions =>
+        {
+            // Enable retry on failure for transient errors
+            // This means adding logic to autmatically re-attempt an operation that fails due to temporary issues (i.e:
+            // Network glitches, temporary database unavailability, timeouts service throttling etc
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorCodesToAdd: null);
+
+            // Set command timeout for long-running queries
+            npgsqlOptions.CommandTimeout(60);
+        }));
+
+
+// Serialize/deserialize enums as strings (e.g. "Monday") instead of integers (e.g. 0)
+// Desirializing (request body -> C#):- Accepts a string like "Monday" and converts it to the WorkoutDay.Monday enum value
+// Serializing (C# -> response body): converts WorkoutDay.Monday back to "Monday" instead of 0
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+
 // Dependency Inject the Validation Enpoints Filter method
 // - typeOf allows DI to resolve the type without registering each one individually
 builder.Services.AddScoped(typeof(ValidationEndPointFilter<>));
+
+builder.Services.AddEndpointsApiExplorer();
 
 
 var app = builder.Build();
@@ -22,6 +44,8 @@ var app = builder.Build();
 var workouts = app.MapGroup("/workouts");
 var workoutsId = app.MapGroup("/workouts/{id}");
 var exercises = app.MapGroup("/exercises");
+
+
 //Creation of Routes and methods for /WorkoutExercises
 var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
     .AddEndpointFilter(async (context, next) =>
@@ -209,7 +233,7 @@ static async Task<IResult> AddExcercise(ExerciseDto exerciseDTO, WorkoutsDb db)
     // }
 
     // Check if the exercise already exists within the workout - prevent duplicate exercises
-    if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return TypedResults.BadRequest();
+    if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return TypedResults.BadRequest("Exercise already exists");
 
     // Create new excercise model
     var exercise = new Exercise

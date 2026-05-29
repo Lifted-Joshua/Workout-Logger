@@ -1,0 +1,15 @@
+## .NET / ASP.NET Core
+bin/
+obj/
+
+## User-specific secrets / local config
+appsettings.Development.json
+
+## Visual Studio / Rider
+.vs/
+*.user
+*.suo
+
+## OS
+.DS_Store
+Thumbs.db
