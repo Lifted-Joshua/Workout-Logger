@@ -43,6 +43,44 @@ namespace WorkoutLogger.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Exercises", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            MuscleGroup = "Chest",
+                            Name = "Bench Press"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            MuscleGroup = "Shoulders",
+                            Name = "Overhead Shoulder Press"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            MuscleGroup = "Back",
+                            Name = "Pull Ups"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            MuscleGroup = "Back",
+                            Name = "Barbell Rows"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            MuscleGroup = "Quadriceps",
+                            Name = "Barbell Squat"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            MuscleGroup = "Hamstrings",
+                            Name = "Romanian Deadlift"
+                        });
                 });
 
             modelBuilder.Entity("WorkoutLogger.Models.Workout", b =>
@@ -67,6 +105,29 @@ namespace WorkoutLogger.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Workouts", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CurrentDay = 0,
+                            DateTime = new DateTimeOffset(new DateTime(2026, 1, 5, 17, 30, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)),
+                            Notes = "Push Day"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CurrentDay = 2,
+                            DateTime = new DateTimeOffset(new DateTime(2026, 1, 7, 18, 15, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)),
+                            Notes = "Pull Day"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CurrentDay = 4,
+                            DateTime = new DateTimeOffset(new DateTime(2026, 1, 9, 17, 30, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)),
+                            Notes = "Leg Day"
+                        });
                 });
 
             modelBuilder.Entity("WorkoutLogger.Models.WorkoutExercise", b =>
@@ -106,6 +167,62 @@ namespace WorkoutLogger.Migrations
                             t.HasCheckConstraint("CK_Sets_Range", "\"Sets\" >= 0 AND \"Sets\" <= 10");
 
                             t.HasCheckConstraint("CK_WeightsKg_Range", "\"WeightKg\" >= 0 AND \"WeightKg\" <= 1000");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ExerciseId = 1,
+                            Reps = 10,
+                            Sets = 4,
+                            WeightKg = 90.0,
+                            WorkoutId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            ExerciseId = 2,
+                            Reps = 12,
+                            Sets = 4,
+                            WeightKg = 25.0,
+                            WorkoutId = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            ExerciseId = 3,
+                            Reps = 5,
+                            Sets = 3,
+                            WeightKg = 115.0,
+                            WorkoutId = 2
+                        },
+                        new
+                        {
+                            Id = 4,
+                            ExerciseId = 4,
+                            Reps = 5,
+                            Sets = 5,
+                            WeightKg = 85.0,
+                            WorkoutId = 2
+                        },
+                        new
+                        {
+                            Id = 5,
+                            ExerciseId = 5,
+                            Reps = 8,
+                            Sets = 6,
+                            WeightKg = 120.0,
+                            WorkoutId = 3
+                        },
+                        new
+                        {
+                            Id = 6,
+                            ExerciseId = 6,
+                            Reps = 6,
+                            Sets = 5,
+                            WeightKg = 140.0,
+                            WorkoutId = 3
                         });
                 });
 

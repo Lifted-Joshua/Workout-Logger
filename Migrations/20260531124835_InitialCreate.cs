@@ -4,6 +4,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace WorkoutLogger.Migrations
 {
     /// <inheritdoc />
@@ -71,6 +73,42 @@ namespace WorkoutLogger.Migrations
                         principalTable: "Workouts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "Exercises",
+                columns: new[] { "Id", "MuscleGroup", "Name" },
+                values: new object[,]
+                {
+                    { 1, "Chest", "Bench Press" },
+                    { 2, "Shoulders", "Overhead Shoulder Press" },
+                    { 3, "Back", "Pull Ups" },
+                    { 4, "Back", "Barbell Rows" },
+                    { 5, "Quadriceps", "Barbell Squat" },
+                    { 6, "Hamstrings", "Romanian Deadlift" }
+                });
+
+            migrationBuilder.InsertData(
+                table: "Workouts",
+                columns: new[] { "Id", "CurrentDay", "DateTime", "Notes" },
+                values: new object[,]
+                {
+                    { 1, 0, new DateTimeOffset(new DateTime(2026, 1, 5, 17, 30, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)), "Push Day" },
+                    { 2, 2, new DateTimeOffset(new DateTime(2026, 1, 7, 18, 15, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)), "Pull Day" },
+                    { 3, 4, new DateTimeOffset(new DateTime(2026, 1, 9, 17, 30, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 1, 0, 0, 0)), "Leg Day" }
+                });
+
+            migrationBuilder.InsertData(
+                table: "WorkoutExercises",
+                columns: new[] { "Id", "ExerciseId", "Reps", "Sets", "WeightKg", "WorkoutId" },
+                values: new object[,]
+                {
+                    { 1, 1, 10, 4, 90.0, 1 },
+                    { 2, 2, 12, 4, 25.0, 1 },
+                    { 3, 3, 5, 3, 115.0, 2 },
+                    { 4, 4, 5, 5, 85.0, 2 },
+                    { 5, 5, 8, 6, 120.0, 3 },
+                    { 6, 6, 6, 5, 140.0, 3 }
                 });
 
             migrationBuilder.CreateIndex(

@@ -47,9 +47,9 @@ public class WorkoutsDb : DbContext
                 .IsRequired();
 
             entity.HasData(
-                new Workout { Id = 1, CurrentDay = WorkoutDay.Monday, DateTime = DateTimeOffset.UtcNow, Notes = "Push Day"},
-                new Workout { Id = 2, CurrentDay = WorkoutDay.Wednesday, DateTime = DateTimeOffset.UtcNow, Notes = "Pull Day"},
-                new Workout { Id = 3, CurrentDay = WorkoutDay.Friday, DateTime = DateTimeOffset.UtcNow, Notes = "Leg Day"}
+                new Workout { Id = 1, CurrentDay = WorkoutDay.Monday, DateTime = new DateTimeOffset(2026, 1, 5, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Push Day"},
+                new Workout { Id = 2, CurrentDay = WorkoutDay.Wednesday, DateTime = new DateTimeOffset(2026, 1, 7, 18, 15, 00, new TimeSpan(1, 0, 0)), Notes = "Pull Day"},
+                new Workout { Id = 3, CurrentDay = WorkoutDay.Friday, DateTime = new DateTimeOffset(2026, 1, 9, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Leg Day"}
             );
         });
 
