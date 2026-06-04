@@ -8,7 +8,7 @@ namespace WorkoutLogger.Models.DTOs;
 /// <summary>
 /// Output/ Response Dto
 /// </summary>
-public class WorkoutExerciseDetailDto
+public class WorkoutExerciseDetails
 {
     public required string Name { get; set; }
     public required string MuscleGroup { get; set; }

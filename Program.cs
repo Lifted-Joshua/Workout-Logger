@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
@@ -31,14 +30,18 @@ builder.Services.AddDbContext<WorkoutsDb>(options =>
             npgsqlOptions.CommandTimeout(60);
         }));
 
-
-// Serialize/deserialize enums as strings (e.g. "Monday") instead of integers (e.g. 0)
-// Desirializing (request body -> C#):- Accepts a string like "Monday" and converts it to the WorkoutDay.Monday enum value
-// Serializing (C# -> response body): converts WorkoutDay.Monday back to "Monday" instead of 0
+// Configure JSON options globally
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
+    // Serialize/deserialize enums as strings (e.g. "Monday") instead of integers (e.g. 0)
+    // Desirializing (request body -> C#):- Accepts a string like "Monday" and converts it to the WorkoutDay.Monday enum value
+    // Serializing (C# -> response body): converts WorkoutDay.Monday back to "Monday" instead of 0
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.WriteIndented = true; // Optional for readability
 });
+
+
 
 // Dependency Inject the Validation Enpoints Filter method
 // - typeOf allows DI to resolve the type without registering each one individually
@@ -94,7 +97,7 @@ exercises.MapPost("/", AddExcercise)
     .AddEndpointFilter<ValidationEndPointFilter<CreateExerciseDto>>();
 
 exercises.MapPost("/bulk", AddExercises)
-    .AddEndpointFilter<ValidationEndPointFilter<CreateExerciseDto>>();
+    .AddEndpointFilter<ValidationEndPointFilter<List<CreateExerciseDto>>>();
 
 // Delete an exercise by id
 exercises.MapDelete("/{id}", DeleteExercise);
@@ -104,7 +107,7 @@ exercises.MapDelete("/{id}", DeleteExercise);
 app.MapGet("/workouts/exercises", GetAllWorkoutExercises);
 // Creates and adds an exercise to a workout
 workoutExercises.MapPost("/", AddExerciseForWokout)
-    .AddEndpointFilter<ValidationEndPointFilter<WorkoutExerciseDto>>();
+    .AddEndpointFilter<ValidationEndPointFilter<CreateWorkoutExerciseDto>>();
 // Updates an exercise under a workout
 workoutExercises.MapPatch("/{exerciseId}", UpdateWorkoutExercise)
     .AddEndpointFilter<ValidationEndPointFilter<UpdateWorkoutExerciseDto>>();
@@ -130,26 +133,15 @@ static async Task<IResult> GetWorkouts(WorkoutsDb db)
 static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 {
     // Eager loading Workout for passed in id and its workoutexercises
-    var getWorkoutWithExercises = await db.Workouts.Include(x => x.WorkoutExercises).FirstOrDefaultAsync(x => x.Id == id);
+    var getWorkoutWithExercises = await db.Workouts.Include(x => x.WorkoutExercises).ThenInclude(x => x.Exercise).FirstOrDefaultAsync(x => x.Id == id);
 
-    if(getWorkoutWithExercises is null) return TypedResults.BadRequest();
-    if(getWorkoutWithExercises.WorkoutExercises.Count == 0) return TypedResults.BadRequest("WorkoutExercises is null");
-
-    // All the exercise Id's belonging to the exercises under workout
-    var exerciseIds = getWorkoutWithExercises.WorkoutExercises.Select(x => x.ExerciseId).ToList();
-
-    // Get all the exercises from the exercise db where the id is equal to any of the id's in exerciseIds
-    var exercises = await db.Exercises.Where(x => exerciseIds.Contains(x.Id)).ToListAsync();
-
-    // exercises.ForEach(ex => Console.WriteLine($"Exercise in exerciseIds: {ex.Id} name: {ex.Name}, muscle group: {ex.MuscleGroup}"));
-
-    if(getWorkoutWithExercises is null) return TypedResults.BadRequest();
+    if(getWorkoutWithExercises is null) return TypedResults.NotFound("Workout Id does not exists in Workouts table");
 
     // Mapping WorkoutExercises to WorkoutExerciseDetailDto
-    var workoutExerciseDetails = getWorkoutWithExercises.WorkoutExercises.Select(x => new WorkoutExerciseDetailDto
+    var workoutExerciseDetails = getWorkoutWithExercises.WorkoutExercises.Select(x => new WorkoutExerciseDetails
     {
-        Name = exercises.Where(y => y.Id == x.ExerciseId).Select(y => y.Name).Single(),
-        MuscleGroup = exercises.Where(y => y.Id == x.ExerciseId).Select(x => x.MuscleGroup).Single(),
+        Name = x.Exercise.Name,
+        MuscleGroup = x.Exercise.MuscleGroup,
         Sets = x.Sets,
         Reps = x.Reps,
         WeightKg = x.WeightKg
@@ -164,7 +156,7 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
         Day = getWorkoutWithExercises.CurrentDay,
         DateTime = getWorkoutWithExercises.DateTime,
         Notes = getWorkoutWithExercises.Notes,
-        Exercises = workoutExerciseDetails ?? new List<WorkoutExerciseDetailDto>() {}
+        Exercises = workoutExerciseDetails ?? new List<WorkoutExerciseDetails>() {}
     };
 
     return TypedResults.Ok(workoutWithExercises);
@@ -187,7 +179,7 @@ static async Task<IResult> UpdateWorkoutById(int id, CreateWorkoutDto workoutDto
         return TypedResults.NoContent();
 
     } else {
-        return TypedResults.BadRequest("WorkoutId does not exist");
+        return TypedResults.NotFound("WorkoutId does not exist");
     }
 }
 
@@ -311,17 +303,26 @@ static async Task<IResult> DeleteExercise(int id, WorkoutsDb db)
 
 static async Task<IResult> GetAllWorkoutExercises(WorkoutsDb db)
 {
-    return TypedResults.Ok(await db.WorkoutExercises.ToListAsync());
+    return TypedResults.Ok(await db.WorkoutExercises.Select(x => new WorkoutExercisesDto
+    {
+        Id = x.Id,
+        WorkoutId = x.WorkoutId,
+        ExerciseId = x.ExerciseId,
+        Sets = x.Sets,
+        Reps = x.Reps,
+        WeightKg = x.WeightKg,
+    })
+    .ToListAsync());
 }
 
-static async Task<IResult> AddExerciseForWokout(int Id, WorkoutExerciseDto workoutExerciseDTO, WorkoutsDb db)
+static async Task<IResult> AddExerciseForWokout(int Id, CreateWorkoutExerciseDto workoutExerciseDTO, WorkoutsDb db)
 {
-    if(workoutExerciseDTO is null) return TypedResults.BadRequest();
+    if(workoutExerciseDTO is null) return TypedResults.BadRequest("Json data is null");
 
     // Checking if workoutId & exerciseId exists already as a combination within WorkoutExercise table
-    var doesWorkoutExercisseExists = await db.WorkoutExercises.Where(x => x.WorkoutId == Id && x.ExerciseId == workoutExerciseDTO.ExerciseId).AnyAsync();
+    var doesWorkoutExerciseExists = await db.WorkoutExercises.Where(x => x.WorkoutId == Id && x.ExerciseId == workoutExerciseDTO.ExerciseId).AnyAsync();
 
-    if(doesWorkoutExercisseExists) return TypedResults.BadRequest();
+    if(doesWorkoutExerciseExists) return TypedResults.BadRequest("The exercise and workout already exists");
 
     //Check if Id passed in for WorkoutId exists in Workouts database
     var workoutIdIsValid = await db.Workouts.FindAsync(Id);
@@ -329,7 +330,7 @@ static async Task<IResult> AddExerciseForWokout(int Id, WorkoutExerciseDto worko
     var exerciseIdIsValid = await db.Exercises.FindAsync(workoutExerciseDTO.ExerciseId);
 
     // If workoutId or exerciseId does not exist in their retrospective databases, return
-    if(workoutIdIsValid is null || exerciseIdIsValid is null) return TypedResults.NotFound();
+    if(workoutIdIsValid is null || exerciseIdIsValid is null) return TypedResults.NotFound("Workout Id or Exercise id does not exist in their retrospective databases");
 
     var workoutExercise = new WorkoutExercise
     {
@@ -350,13 +351,15 @@ static async Task<IResult> UpdateWorkoutExercise(int Id, int exerciseId, UpdateW
 {
     if(updateWorkoutExerciseDTO is null) return TypedResults.BadRequest();
 
+    // if(updateWorkoutExerciseDTO.Sets is null || updateWorkoutExerciseDTO.Reps is null || updateWorkoutExerciseDTO.WeightKg is null) return TypedResults.BadRequest("A field in the json is null");
+
     var workoutExerciseToUpdate = await db.WorkoutExercises.FirstOrDefaultAsync(x => x.WorkoutId == Id && x.ExerciseId == exerciseId);
 
     if(workoutExerciseToUpdate is null) return TypedResults.NotFound();
 
-    workoutExerciseToUpdate.Sets = updateWorkoutExerciseDTO.Sets;
-    workoutExerciseToUpdate.Reps = updateWorkoutExerciseDTO.Reps;
-    workoutExerciseToUpdate.WeightKg = updateWorkoutExerciseDTO.WeightKg;
+    workoutExerciseToUpdate.Sets = updateWorkoutExerciseDTO.Sets is null ? workoutExerciseToUpdate.Sets : updateWorkoutExerciseDTO.Sets!.Value;
+    workoutExerciseToUpdate.Reps = updateWorkoutExerciseDTO.Reps is null ? workoutExerciseToUpdate.Reps : updateWorkoutExerciseDTO.Reps!.Value;
+    workoutExerciseToUpdate.WeightKg = updateWorkoutExerciseDTO.WeightKg is null ? workoutExerciseToUpdate.WeightKg : updateWorkoutExerciseDTO.WeightKg!.Value;
 
     await db.SaveChangesAsync();
     return TypedResults.NoContent();

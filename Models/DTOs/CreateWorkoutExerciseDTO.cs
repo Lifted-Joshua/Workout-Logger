@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace WorkoutLogger.Models.DTOs;
-public class WorkoutExerciseDto
+public class CreateWorkoutExerciseDto
 {
     public int ExerciseId { get; set; }
     [Range(1, 10)]
