@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
 
 // Loads default configurations
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +14,6 @@ string? connectionString = builder.Configuration.GetConnectionString("DefaultCon
 
 // Checking if connection string is valid
 if(string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationException("Database connection string is not configured.");
-
 
 builder.Services.AddDbContext<WorkoutsDb>(options =>
     options.UseNpgsql(connectionString,
@@ -41,16 +42,36 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.WriteIndented = true; // Optional for readability
 });
 
-
+builder.Services.AddSwaggerGen(options =>
+{
+    // Path to the generated XML file
+    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    options.IncludeXmlComments(xmlPath);
+    // Display enums as strings in Swagger UI
+    options.UseInlineDefinitionsForEnums();
+});
 
 // Dependency Inject the Validation Enpoints Filter method
 // - typeOf allows DI to resolve the type without registering each one individually
 builder.Services.AddScoped(typeof(ValidationEndPointFilter<>));
 
-builder.Services.AddEndpointsApiExplorer();
+// This tool .AddEndpointsApiExplorer registers services that describe endpoints directly mapped via app.MapGet, app.MapPost
+builder.Services.AddEndpointsApiExplorer(); // Required for Swagger to discover endpoints
 
 
 var app = builder.Build();
+
+if(app.Environment.IsDevelopment())
+{
+    // Enable Swagger UI (only in development for production, wrap in app.Environment.IsDevelopment())
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Workout Logger Api");
+        options.RoutePrefix = ""; // Serve Swagger UI at the root (e.g., https://localhost:5001)
+    });
+}
 
 var workouts = app.MapGroup("/workouts");
 var workoutsId = app.MapGroup("/workouts/{id}");
@@ -74,46 +95,105 @@ var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
 
 // Creation of Routes and method for /workouts
 // Gets all Workouts
-workouts.MapGet("/", GetWorkouts);
+workouts.MapGet("/", GetWorkouts)
+    .WithSummary("Returns all Workouts")
+    .WithDescription("This endpoint returns all workouts in the Workouts table")
+    .Produces<WorkoutDto[]>(StatusCodes.Status200OK);
+
+// Creates a workout
+workouts.MapPost("/", CreateWorkout)
+    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>()
+    .WithSummary("Creates a new Workout")
+    .WithDescription("This endpoint creates a new Workout in the Workouts table")
+    .Produces<WorkoutDto>(StatusCodes.Status201Created); // Response type
+
+
 // Gets a specific workout and it's exercises by id
-workoutsId.MapGet("/", GetWorkoutsById);
+workoutsId.MapGet("/", GetWorkoutsById)
+    .WithSummary("Returns Workout with matching Id")
+    .WithDescription("This endpoint returns the Workout for the Id passed into the url")
+    .Produces<WorkoutWithExerciseDto>(StatusCodes.Status200OK) // Response type
+    .Produces(StatusCodes.Status404NotFound) // Possible error
+    .Produces(StatusCodes.Status400BadRequest); // Possible error
 
 // Updates a specific workout (pass in id of workout to update)
 // Calling validationEndpointFilter to validate the model passed in (its data annotations) before the handler is called
 workoutsId.MapPut("/", UpdateWorkoutById)
-    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>();
-// Creates a workout
-workouts.MapPost("/", CreateWorkout)
-    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>();
+    .AddEndpointFilter<ValidationEndPointFilter<WorkoutDto>>()
+    .WithSummary("Updates Workout with matching Id")
+    .WithDescription("This endpoint updates the Workout for the Id passed into the url")
+    .Produces(StatusCodes.Status204NoContent) // Response type
+    .Produces(StatusCodes.Status404NotFound); // Possible error
+
 // Deletes a workout by id (pass in id of workout to delete)
-workoutsId.MapDelete("/", DeleteWorkoutById);
+workoutsId.MapDelete("/", DeleteWorkoutById)
+    .WithSummary("Deletes a Workout with the matching Id")
+    .WithDescription("This endpoint deletes the Workout for the Id passed into the url")
+    .Produces(StatusCodes.Status204NoContent) // Response type
+    .Produces(StatusCodes.Status404NotFound); // Possible error
 
 
 // Get all Exercises
-exercises.MapGet("/", GetExercises);
+exercises.MapGet("/", GetExercises)
+    .WithSummary("Returns all Exercises")
+    .WithDescription("This endpoint returns all Exercises in the Exercises table")
+    .Produces<List<ExerciseDto>>(StatusCodes.Status200OK);
 
 // Add a new exercise
 exercises.MapPost("/", AddExcercise)
-    .AddEndpointFilter<ValidationEndPointFilter<CreateExerciseDto>>();
+    .AddEndpointFilter<ValidationEndPointFilter<CreateExerciseDto>>()
+    .WithSummary("Create a new Exercise")
+    .WithDescription("This endpoint creates a new Exercise in the Exercises table")
+    .Produces<int>(StatusCodes.Status201Created)
+    .Produces(StatusCodes.Status400BadRequest);
 
 exercises.MapPost("/bulk", AddExercises)
-    .AddEndpointFilter<ValidationEndPointFilter<List<CreateExerciseDto>>>();
+    .AddEndpointFilter<ValidationEndPointFilter<List<CreateExerciseDto>>>()
+    .WithSummary("Create a list of new Exercises")
+    .WithDescription("This endpoint creates a list of new Exercises in the Exercises table")
+    .Produces<List<Exercise>>(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest);
 
 // Delete an exercise by id
-exercises.MapDelete("/{id}", DeleteExercise);
+exercises.MapDelete("/{id}", DeleteExercise)
+    .WithSummary("Deletes an Exercise with the matching Id")
+    .WithDescription("This endpoint deletes the Exercise for the Id passed into the url")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces(StatusCodes.Status404NotFound);
 
 
 //Gets all exercises for a workout
-app.MapGet("/workouts/exercises", GetAllWorkoutExercises);
+app.MapGet("/workouts/exercises", GetAllWorkoutExercises)
+    .WithSummary("Returns all WorkoutExercises")
+    .WithDescription("This endpoint returns all Workout Exercises in the WorkoutExercises table")
+    .Produces<List<WorkoutExercisesDto>>(StatusCodes.Status200OK);
+
+
 // Creates and adds an exercise to a workout
 workoutExercises.MapPost("/", AddExerciseForWokout)
-    .AddEndpointFilter<ValidationEndPointFilter<CreateWorkoutExerciseDto>>();
+    .AddEndpointFilter<ValidationEndPointFilter<CreateWorkoutExerciseDto>>()
+    .WithSummary("Create a new WorkoutExercise")
+    .WithDescription("This endpoint creates a new WorkoutExercise in the WorkoutExercises table")
+    .Produces<WorkoutExercise>(StatusCodes.Status201Created)
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status404NotFound);
+
+
 // Updates an exercise under a workout
 workoutExercises.MapPatch("/{exerciseId}", UpdateWorkoutExercise)
-    .AddEndpointFilter<ValidationEndPointFilter<UpdateWorkoutExerciseDto>>();
-// Deletes an exercise from a workout
-workoutExercises.MapDelete("/{exerciseId}", DeleteExerciseFromWorkout);
+    .AddEndpointFilter<ValidationEndPointFilter<UpdateWorkoutExerciseDto>>()
+    .WithSummary("Updates WorkoutExercise with matching Id")
+    .WithDescription("This endpoint updates the WorkoutExercise for the Id passed into the url")
+    .Produces(StatusCodes.Status204NoContent) // Response type
+    .Produces(StatusCodes.Status400BadRequest)
+    .Produces(StatusCodes.Status404NotFound); // Possible error
 
+// Deletes an exercise from a workout
+workoutExercises.MapDelete("/{exerciseId}", DeleteExerciseFromWorkout)
+    .WithSummary("Deletes a WorkoutExercise with the matching Id")
+    .WithDescription("This endpoint deletes the Exercise for the Id passed into the url")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces(StatusCodes.Status404NotFound);
 
 
 
@@ -164,8 +244,6 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
 
 static async Task<IResult> UpdateWorkoutById(int id, CreateWorkoutDto workoutDto, WorkoutsDb db)
 {
-    // Check if workoutDto is null
-    // if(workoutDto is null) return TypedResults.BadRequest("workout is null");
 
     // Check if passed in Id exists in workouts database
     var workout = await db.Workouts.FindAsync(id);
@@ -186,7 +264,6 @@ static async Task<IResult> UpdateWorkoutById(int id, CreateWorkoutDto workoutDto
 
 static async Task<IResult> CreateWorkout(CreateWorkoutDto workoutDTO, WorkoutsDb db)
 {
-    // if(workoutDTO is null) return TypedResults.BadRequest();
 
     var workout = new Workout
     {
@@ -236,15 +313,6 @@ static async Task<IResult> GetExercises(WorkoutsDb db)
 
 static async Task<IResult> AddExcercise(CreateExerciseDto exerciseDTO, WorkoutsDb db)
 {
-    // //Check if excercise passed in is null
-    // if(exerciseDTO is null) return TypedResults.BadRequest();
-
-    // //Check if fields is empty, null or whitespace
-    // if(string.IsNullOrWhiteSpace(exerciseDTO.Name) || string.IsNullOrWhiteSpace(exerciseDTO.MuscleGroup))
-    // {
-    //     return TypedResults.BadRequest();
-    // }
-
     // Check if the exercise already exists within the workout - prevent duplicate exercises
     if(await db.Exercises.AnyAsync(x => string.Equals(x.Name, exerciseDTO.Name, StringComparison.OrdinalIgnoreCase))) return TypedResults.BadRequest("Exercise already exists");
 
@@ -350,8 +418,6 @@ static async Task<IResult> AddExerciseForWokout(int Id, CreateWorkoutExerciseDto
 static async Task<IResult> UpdateWorkoutExercise(int Id, int exerciseId, UpdateWorkoutExerciseDto updateWorkoutExerciseDTO, WorkoutsDb db)
 {
     if(updateWorkoutExerciseDTO is null) return TypedResults.BadRequest();
-
-    // if(updateWorkoutExerciseDTO.Sets is null || updateWorkoutExerciseDTO.Reps is null || updateWorkoutExerciseDTO.WeightKg is null) return TypedResults.BadRequest("A field in the json is null");
 
     var workoutExerciseToUpdate = await db.WorkoutExercises.FirstOrDefaultAsync(x => x.WorkoutId == Id && x.ExerciseId == exerciseId);
 
