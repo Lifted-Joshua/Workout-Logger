@@ -3,8 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Hosting;
+using WorkoutLogger.EndpointFilter;
 
 // Loads default configurations
 var builder = WebApplication.CreateBuilder(args);
@@ -76,6 +75,7 @@ if(app.Environment.IsDevelopment())
 var workouts = app.MapGroup("/workouts");
 var workoutsId = app.MapGroup("/workouts/{id}");
 var exercises = app.MapGroup("/exercises");
+var auth = app.MapGroup("/auth");
 
 
 //Creation of Routes and methods for /WorkoutExercises
@@ -194,6 +194,17 @@ workoutExercises.MapDelete("/{exerciseId}", DeleteExerciseFromWorkout)
     .WithDescription("This endpoint deletes the Exercise for the Id passed into the url")
     .Produces(StatusCodes.Status204NoContent)
     .Produces(StatusCodes.Status404NotFound);
+
+
+// Create an authentication register endpoint where user sends an CreateUserDto to the endpoint and it is added to the database and the password is encrpted/ hashed
+auth.MapPost("/register", RegisterUser)
+    .AddEndpointFilter<ValidationEndPointFilter<RegisterUserDto>>();
+
+auth.MapPost("/login", LoginUser)
+    .AddEndpointFilter<ValidationEndPointFilter<LoginUserDto>>();
+
+//Create an authentication login endpoint where the user logs in and is given a jwt token  if credentials are valid/ exist in database
+
 
 
 
@@ -439,6 +450,22 @@ static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, Wor
     db.WorkoutExercises.Remove(exerciseToDelete);
     await db.SaveChangesAsync();
 
+    return TypedResults.NoContent();
+}
+
+
+
+static async Task<IResult> RegisterUser(RegisterUserDto createUserDto, WorkoutsDb db)
+{
+   return TypedResults.NotFound();
+}
+
+static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
+{
+    //Check if the username exists - paths for yes or no
+    // if username exists check if the password sent for the username matches the password stored in database for that user
+
+    // If password matches give user a jwt token if it doesnt then user details are incorrect tell them to log in again
     return TypedResults.NoContent();
 }
 

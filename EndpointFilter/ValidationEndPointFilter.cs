@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 
-namespace WorkoutLogger.Models;
+namespace WorkoutLogger.EndpointFilter;
 
 
 // This generic endpoint filter validates incoming models using Data Annotations.

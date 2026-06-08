@@ -2,6 +2,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Enums;
 using WorkoutLogger.Models;
+using WorkoutLogger.Models.Auth;
 
 namespace WorkoutLogger.Data;
 public class WorkoutsDb : DbContext
@@ -12,6 +13,10 @@ public class WorkoutsDb : DbContext
     public DbSet<Workout> Workouts { get; set; }
     public DbSet<Exercise> Exercises { get; set; }
     public DbSet<WorkoutExercise> WorkoutExercises { get; set; }
+    /// <summary>
+    /// Signed in Users table
+    /// </summary>
+    public DbSet<User> Users { get; set; }
 
     /// <summary>
     /// Configuring our entity classes using ModelBuilder provided by FluentAPI
@@ -19,6 +24,22 @@ public class WorkoutsDb : DbContext
     /// <param name="modelBuilder"></param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>(entity =>
+        {
+            // Defines table name for User Entity
+            entity.ToTable("Users");
+
+            // Defines User.Id as the primary key
+            entity.HasKey(x => x.Id);
+
+            // Setting this property as required with a max length
+            entity.Property(x => x.UserName).IsRequired().HasMaxLength(12);
+
+            // Setting this property as required with a max length
+            entity.Property(x => x.PassWord).IsRequired().HasMaxLength(16);
+
+        });
+
         modelBuilder.Entity<Workout>(entity =>
         {
             // Defines table name for Workout Entity
