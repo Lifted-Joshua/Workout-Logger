@@ -4,6 +4,10 @@ using WorkoutLogger.Data;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.DTOs;
 using WorkoutLogger.EndpointFilter;
+using Microsoft.IdentityModel.Tokens;
+using WorkoutLogger.Models.Auth;
+using WorkoutLogger.Security;
+using Npgsql.Replication;
 
 // Loads default configurations
 var builder = WebApplication.CreateBuilder(args);
@@ -349,15 +353,15 @@ static async Task<IResult> AddExercises(List<CreateExerciseDto> exerciseDtos, Wo
 
     var workouts = exerciseDtos.Select(dto => new Exercise
     {
-        Name = dto.Name,
-        MuscleGroup = dto.MuscleGroup
+        Name = dto.Name!,
+        MuscleGroup = dto.MuscleGroup!
     }).ToList();
 
     db.Exercises.AddRange(workouts);
     await db.SaveChangesAsync();
 
     return Results.Ok(workouts);
-};
+}
 
 static async Task<IResult> DeleteExercise(int id, WorkoutsDb db)
 {
@@ -457,8 +461,30 @@ static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, Wor
 
 static async Task<IResult> RegisterUser(RegisterUserDto createUserDto, WorkoutsDb db)
 {
+
+    if(string.IsNullOrWhiteSpace(createUserDto.Username) || string.IsNullOrWhiteSpace(createUserDto.Password))
+        return TypedResults.BadRequest("Username and Password are required");
+
+    var normalizedUsername = createUserDto.Username!.Trim().ToLower();
+    var password = createUserDto.Password!;
+
+    // Check if username already exists in the database if it does return username already exists
+    var existing = await db.Users.Where(x => x.UserName == normalizedUsername).FirstOrDefaultAsync();
+
+    if(existing != null) return TypedResults.BadRequest("User with this username already exists");
+
+    var userEntity = new User
+    {
+        UserName = normalizedUsername
+    };
+
+    userEntity.PasswordHash = PasswordHashing.HashPassword(userEntity, password);
+
+
+
    return TypedResults.NotFound();
 }
+
 
 static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
 {
