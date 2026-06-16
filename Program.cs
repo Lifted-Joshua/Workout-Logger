@@ -459,14 +459,13 @@ static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, Wor
 
 
 
-static async Task<IResult> RegisterUser(RegisterUserDto createUserDto, WorkoutsDb db)
+static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, WorkoutsDb db)
 {
-
-    if(string.IsNullOrWhiteSpace(createUserDto.Username) || string.IsNullOrWhiteSpace(createUserDto.Password))
+    if(string.IsNullOrWhiteSpace(registerUserDto.Username) || string.IsNullOrWhiteSpace(registerUserDto.Password))
         return TypedResults.BadRequest("Username and Password are required");
 
-    var normalizedUsername = createUserDto.Username!.Trim().ToLower();
-    var password = createUserDto.Password!;
+    var normalizedUsername = registerUserDto.Username!.Trim().ToLower();
+    var password = registerUserDto.Password!;
 
     // Check if username already exists in the database if it does return username already exists
     var existing = await db.Users.Where(x => x.UserName == normalizedUsername).FirstOrDefaultAsync();
@@ -480,14 +479,16 @@ static async Task<IResult> RegisterUser(RegisterUserDto createUserDto, WorkoutsD
 
     userEntity.PasswordHash = PasswordHashing.HashPassword(userEntity, password);
 
+    db.Users.Add(userEntity);
+    await db.SaveChangesAsync();
 
-
-   return TypedResults.NotFound();
+    return TypedResults.Created("/auth/register", registerUserDto);
 }
 
 
 static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
 {
+    // Implement loggin user and then implememnt adding jwt keys
     //Check if the username exists - paths for yes or no
     // if username exists check if the password sent for the username matches the password stored in database for that user
 

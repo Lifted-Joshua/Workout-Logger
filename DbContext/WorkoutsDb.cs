@@ -36,7 +36,7 @@ public class WorkoutsDb : DbContext
             entity.Property(x => x.UserName).IsRequired().HasMaxLength(12);
 
             // Setting this property as required with a max length
-            entity.Property(x => x.PassWord).IsRequired().HasMaxLength(16);
+            entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(200);
 
         });
 

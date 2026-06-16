@@ -12,8 +12,8 @@ using WorkoutLogger.Data;
 namespace WorkoutLogger.Migrations
 {
     [DbContext(typeof(WorkoutsDb))]
-    [Migration("20260531124835_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260616191616_UpdatedUserTablePropertyMigrations")]
+    partial class UpdatedUserTablePropertyMigrations
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,29 @@ namespace WorkoutLogger.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("WorkoutLogger.Models.Auth.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users", (string)null);
+                });
 
             modelBuilder.Entity("WorkoutLogger.Models.Exercise", b =>
                 {
