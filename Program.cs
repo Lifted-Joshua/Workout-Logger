@@ -488,12 +488,31 @@ static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, Workout
 
 static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
 {
+    if(string.IsNullOrWhiteSpace(loginUserDto.Username) || string.IsNullOrWhiteSpace(loginUserDto.Password))
+    {
+        throw new ArgumentNullException(
+            $"{nameof(loginUserDto.Username)} or {nameof(loginUserDto.Password)} cannot be empty",
+            innerException: null);
+    }
+
+    var registeredUser = await db.Users.FirstOrDefaultAsync(x => x.UserName.ToLower() == loginUserDto.Username.ToLower());
+
+    if(registeredUser is null) return TypedResults.BadRequest("Username does not exist");
+
+    var registeredUserPassword = registeredUser.PasswordHash;
+
+    var result = PasswordHashing.VerifyPassword(registeredUserPassword,
+                                                loginUserDto.Password);
+
+    Console.WriteLine("This is the result" + result);
     // Implement loggin user and then implememnt adding jwt keys
     //Check if the username exists - paths for yes or no
     // if username exists check if the password sent for the username matches the password stored in database for that user
 
     // If password matches give user a jwt token if it doesnt then user details are incorrect tell them to log in again
-    return TypedResults.NoContent();
+
+
+    return TypedResults.Ok("The result is " + result);
 }
 
 app.Run();
