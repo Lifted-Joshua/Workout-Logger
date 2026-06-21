@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace WorkoutLogger.Models.DTOs;
-public class RegisterUserDto
+
+namespace WorkoutLogger.Models.DTOs.Authentication;
+public sealed class RegisterUserDto
 {
     [Required, MinLength(1), MaxLength(12)]
     public string? Username { get; set; }

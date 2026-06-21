@@ -7,7 +7,12 @@ using WorkoutLogger.EndpointFilter;
 using Microsoft.IdentityModel.Tokens;
 using WorkoutLogger.Models.Auth;
 using WorkoutLogger.Security;
-using Npgsql.Replication;
+using WorkoutLogger.Models.JWT;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Text;
+using WorkoutLogger.Models.DTOs.Authentication;
+using WorkoutLogger.Jwt;
+using Microsoft.Extensions.Options;
 
 // Loads default configurations
 var builder = WebApplication.CreateBuilder(args);
@@ -62,6 +67,49 @@ builder.Services.AddScoped(typeof(ValidationEndPointFilter<>));
 // This tool .AddEndpointsApiExplorer registers services that describe endpoints directly mapped via app.MapGet, app.MapPost
 builder.Services.AddEndpointsApiExplorer(); // Required for Swagger to discover endpoints
 
+// Here we are going into our configurations(appsettings.json) and grabbing
+// the Jwt section and loading those values into our strongly typed object JwtOptions
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+// Gets the jwt configuration section and binds/ maps it to JwtOptions object and returns us the fully populated object
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
+
+if(string.IsNullOrWhiteSpace(jwtOptions?.Key)) throw new InvalidOperationException("Jwt key is not configured. Please configure Jwt key in AppSettings.Json");
+
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.IncludeErrorDetails = true; // Remove when in production
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions!.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions!.Audience,
+
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtOptions.Key)
+            ),
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+
+            RoleClaimType = "role",
+            NameClaimType = "sub"
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    // A policy is a named rule that defines which role and/or claims are required.
+    // When the policy is attached to an endpoint ASP.NET checks the JWT claims and roles and only
+    // allows access if all the policy requirements are satisfied
+    options.AddPolicy("Reports.Read", policy => policy.RequireClaim("scope", "Reports.Read"));
+});
 
 var app = builder.Build();
 
@@ -75,6 +123,10 @@ if(app.Environment.IsDevelopment())
         options.RoutePrefix = ""; // Serve Swagger UI at the root (e.g., https://localhost:5001)
     });
 }
+
+//Authentication needs to happen before authorisation
+app.UseAuthentication();
+app.UseAuthorization();
 
 var workouts = app.MapGroup("/workouts");
 var workoutsId = app.MapGroup("/workouts/{id}");
@@ -486,7 +538,7 @@ static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, Workout
 }
 
 
-static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
+static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db, IOptions<JwtOptions> jwtOptions)
 {
     if(string.IsNullOrWhiteSpace(loginUserDto.Username) || string.IsNullOrWhiteSpace(loginUserDto.Password))
     {
@@ -501,18 +553,22 @@ static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db)
 
     var registeredUserPassword = registeredUser.PasswordHash;
 
-    var result = PasswordHashing.VerifyPassword(registeredUserPassword,
+    var isPasswordValid = PasswordHashing.VerifyPassword(registeredUserPassword,
                                                 loginUserDto.Password);
 
-    Console.WriteLine("This is the result" + result);
-    // Implement loggin user and then implememnt adding jwt keys
-    //Check if the username exists - paths for yes or no
-    // if username exists check if the password sent for the username matches the password stored in database for that user
+    // If the result is true implement jwt if the result is false then return incorrect password to user
+    if(!isPasswordValid) return TypedResults.Unauthorized();
 
-    // If password matches give user a jwt token if it doesnt then user details are incorrect tell them to log in again
+    // Generate Jwt Token
+    var token = JwtTokenHelper.GenerateJwtToken
+    (
+        registeredUser.Id,
+        registeredUser.UserName,
+        jwtOptions);
 
 
-    return TypedResults.Ok("The result is " + result);
+
+    return TypedResults.Ok(new {token});
 }
 
 app.Run();

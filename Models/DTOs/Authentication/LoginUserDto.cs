@@ -1,11 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace WorkoutLogger.Models.DTOs;
-public class LoginUserDto
+namespace WorkoutLogger.Models.DTOs.Authentication;
+/// <summary>
+/// NonInhertiable class used a model for logging in users.
+/// </summary>
+public sealed class LoginUserDto
 {
     [Required, MinLength(1), MaxLength(12)]
     public string? Username { get; set; }
