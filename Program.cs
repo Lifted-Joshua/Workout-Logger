@@ -128,14 +128,19 @@ if(app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-var workouts = app.MapGroup("/workouts");
-var workoutsId = app.MapGroup("/workouts/{id}");
+var workouts = app.MapGroup("/workouts")
+    .AddEndpointFilter(new UserIdValidationFilter());
+
+var workoutsId = app.MapGroup("/workouts/{id}")
+    .AddEndpointFilter(new UserIdValidationFilter());
+
 var exercises = app.MapGroup("/exercises");
 var auth = app.MapGroup("/auth");
 
 
 //Creation of Routes and methods for /WorkoutExercises
 var workoutExercises = app.MapGroup("/workouts/{id:int}/exercises")
+    .AddEndpointFilter(new UserIdValidationFilter())
     .AddEndpointFilter(async (context, next) =>
     {
         //Validate that the id is positive
@@ -226,7 +231,8 @@ app.MapGet("/workouts/exercises", GetAllWorkoutExercises)
 
 
 // Creates and adds an exercise to a workout
-workoutExercises.MapPost("/", AddExerciseForWokout)
+// Double confirm later if this should be a post endpoint or a put endpoint
+workoutExercises.MapPost("/", AddWorkoutExercises)
     .AddEndpointFilter<ValidationEndPointFilter<CreateWorkoutExerciseDto>>()
     .WithSummary("Create a new WorkoutExercise")
     .WithDescription("This endpoint creates a new WorkoutExercise in the WorkoutExercises table")
@@ -329,20 +335,34 @@ static async Task<IResult> UpdateWorkoutById(int id, CreateWorkoutDto workoutDto
 }
 
 
-static async Task<IResult> CreateWorkout(CreateWorkoutDto workoutDTO, WorkoutsDb db)
+static async Task<IResult> CreateWorkout(CreateWorkoutDto workoutDTO, WorkoutsDb db, HttpContext httpContext)
 {
+    // Ensure user is authenticated
+    if (!httpContext.User.Identity?.IsAuthenticated ?? false)
+        return TypedResults.Unauthorized();
 
-    var workout = new Workout
+    // Extract the userId claim safely
+    string? str = httpContext.User.FindFirst("userId")?.Value;
+
+    if (int.TryParse(str, out int userId))
     {
-        CurrentDay = workoutDTO.CurrentDay!.Value,
-        DateTime = workoutDTO.DateTime!.Value,
-        Notes = workoutDTO.Notes ?? string.Empty,
-    };
+        var workout = new Workout
+        {
+            UserId = userId,
+            CurrentDay = workoutDTO.CurrentDay!.Value,
+            DateTime = workoutDTO.DateTime!.Value,
+            Notes = workoutDTO.Notes ?? string.Empty,
+        };
 
-    db.Workouts.Add(workout);
-    await db.SaveChangesAsync();
+        db.Workouts.Add(workout);
+        await db.SaveChangesAsync();
 
-    return TypedResults.Created($"workouts/{workout.Id}", workout);
+        return TypedResults.Created($"workouts/{workout.Id}", workout);
+
+    }
+
+    return Results.BadRequest("UserId claim missing in token.");
+
 }
 
 static async Task<IResult> DeleteWorkoutById(int id, WorkoutsDb db)
@@ -450,13 +470,12 @@ static async Task<IResult> GetAllWorkoutExercises(WorkoutsDb db)
     .ToListAsync());
 }
 
-static async Task<IResult> AddExerciseForWokout(int Id, CreateWorkoutExerciseDto workoutExerciseDTO, WorkoutsDb db)
+static async Task<IResult> AddWorkoutExercises(int Id, CreateWorkoutExerciseDto workoutExerciseDTO, WorkoutsDb db)
 {
     if(workoutExerciseDTO is null) return TypedResults.BadRequest("Json data is null");
 
     // Checking if workoutId & exerciseId exists already as a combination within WorkoutExercise table
     var doesWorkoutExerciseExists = await db.WorkoutExercises.Where(x => x.WorkoutId == Id && x.ExerciseId == workoutExerciseDTO.ExerciseId).AnyAsync();
-
     if(doesWorkoutExerciseExists) return TypedResults.BadRequest("The exercise and workout already exists");
 
     //Check if Id passed in for WorkoutId exists in Workouts database
@@ -510,7 +529,6 @@ static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, Wor
 }
 
 
-
 static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, WorkoutsDb db)
 {
     if(string.IsNullOrWhiteSpace(registerUserDto.Username) || string.IsNullOrWhiteSpace(registerUserDto.Password))
@@ -549,6 +567,7 @@ static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db, I
 
     var registeredUser = await db.Users.FirstOrDefaultAsync(x => x.UserName.ToLower() == loginUserDto.Username.ToLower());
 
+    // Registered User does not exist
     if(registeredUser is null) return TypedResults.BadRequest("Username does not exist");
 
     var registeredUserPassword = registeredUser.PasswordHash;
@@ -560,13 +579,10 @@ static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db, I
     if(!isPasswordValid) return TypedResults.Unauthorized();
 
     // Generate Jwt Token
-    var token = JwtTokenHelper.GenerateJwtToken
-    (
+    var token = JwtTokenHelper.GenerateJwtToken(
         registeredUser.Id,
         registeredUser.UserName,
         jwtOptions);
-
-
 
     return TypedResults.Ok(new {token});
 }
