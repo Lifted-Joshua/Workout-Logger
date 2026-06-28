@@ -1,8 +1,10 @@
 using System;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using WorkoutLogger.Enums;
 using WorkoutLogger.Models;
 using WorkoutLogger.Models.Auth;
+using WorkoutLogger.Security;
 
 namespace WorkoutLogger.Data;
 public class WorkoutsDb : DbContext
@@ -36,8 +38,21 @@ public class WorkoutsDb : DbContext
             entity.Property(x => x.UserName).IsRequired().HasMaxLength(12);
 
             // Setting this property as required with a max length
-            entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.HashedPassword).IsRequired().HasMaxLength(200);
 
+            // One user has many workouts with a
+            // workout having one user and a workout having a
+            // userId which is required
+            entity
+                .HasMany(x => x.Workouts)
+                .WithOne(x => x.User)
+                .HasForeignKey(x => x.UserId)
+                .IsRequired();
+
+            // Seeding a user
+            entity.HasData(
+                new User { Id = 1, UserName = "Jacob123" , HashedPassword = "AQAAAAIAAYagAAAAEN8qiEo0L+DnjddUW1s1cr/vfatmU7m99CWPlYSW8gAcC90eM0ES9ZnxX3iyy6YpFQ==" }
+            );
         });
 
         modelBuilder.Entity<Workout>(entity =>
@@ -67,10 +82,19 @@ public class WorkoutsDb : DbContext
                 .HasForeignKey(x => x.WorkoutId)
                 .IsRequired();
 
+            // Defining many to one relationship with User
+            // Many workouts have one user
+            entity
+                .HasOne(x => x.User)
+                .WithMany(x => x.Workouts)
+                .HasForeignKey(x => x.UserId)
+                .IsRequired();
+
+            // Define the UserId foregin key
             entity.HasData(
-                new Workout { Id = 1, CurrentDay = WorkoutDay.Monday, DateTime = new DateTimeOffset(2026, 1, 5, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Push Day"},
-                new Workout { Id = 2, CurrentDay = WorkoutDay.Wednesday, DateTime = new DateTimeOffset(2026, 1, 7, 18, 15, 00, new TimeSpan(1, 0, 0)), Notes = "Pull Day"},
-                new Workout { Id = 3, CurrentDay = WorkoutDay.Friday, DateTime = new DateTimeOffset(2026, 1, 9, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Leg Day"}
+                new Workout { Id = 1, UserId = 1, CurrentDay = WorkoutDay.Monday, DateTime = new DateTimeOffset(2026, 1, 5, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Push Day"},
+                new Workout { Id = 2, UserId = 1, CurrentDay = WorkoutDay.Wednesday, DateTime = new DateTimeOffset(2026, 1, 7, 18, 15, 00, new TimeSpan(1, 0, 0)), Notes = "Pull Day"},
+                new Workout { Id = 3, UserId = 1, CurrentDay = WorkoutDay.Friday, DateTime = new DateTimeOffset(2026, 1, 9, 17, 30, 00, new TimeSpan(1, 0, 0)), Notes = "Leg Day"}
             );
         });
 
@@ -156,4 +180,6 @@ public class WorkoutsDb : DbContext
 
         });
     }
+
+    // private static string GenerateHashedPassword(User user, string password) => PasswordHashing.HashPassword(user, password);
 }

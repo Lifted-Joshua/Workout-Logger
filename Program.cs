@@ -270,17 +270,26 @@ auth.MapPost("/login", LoginUser)
 
 
 
-static async Task<IResult> GetWorkouts(WorkoutsDb db)
+static async Task<IResult> GetWorkouts(HttpContext context, WorkoutsDb db)
 {
-    // We specifically want just the workout.
-    return TypedResults.Ok(await db.Workouts.Select(x => new WorkoutDto
+    // Grab Jwt UserId from HttpContext
+    var jwtUserId = context.Items["UserId"] as int?;
+
+    // Assert if Jwt UserId is null
+    if (jwtUserId is null) return TypedResults.Unauthorized();
+
+    // Get the workouts where the UserId of the Workouts matches the jwt UserId
+    var workoutsForUser = await db.Workouts.Where(x => x.UserId == jwtUserId).ToListAsync();
+
+    // Map each WorkoutsForUser to a WorkoutDto and return that to the user
+    return TypedResults.Ok(workoutsForUser.Select(x => new WorkoutDto
     {
         Id = x.Id,
         CurrentDay = x.CurrentDay,
         DateTime = x.DateTime,
         Notes = x.Notes
     })
-    .ToArrayAsync());
+    .ToArray());
 }
 
 static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
@@ -297,7 +306,7 @@ static async Task<IResult> GetWorkoutsById(int id, WorkoutsDb db)
         MuscleGroup = x.Exercise.MuscleGroup,
         Sets = x.Sets,
         Reps = x.Reps,
-        WeightKg = x.WeightKg
+        WeightKg = x.WeightKg,
     }).ToList();
 
 
@@ -528,7 +537,7 @@ static async Task<IResult> DeleteExerciseFromWorkout(int Id, int exerciseId, Wor
     return TypedResults.NoContent();
 }
 
-
+/// Endpoint handler method for registering user
 static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, WorkoutsDb db)
 {
     if(string.IsNullOrWhiteSpace(registerUserDto.Username) || string.IsNullOrWhiteSpace(registerUserDto.Password))
@@ -547,7 +556,7 @@ static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, Workout
         UserName = normalizedUsername
     };
 
-    userEntity.PasswordHash = PasswordHashing.HashPassword(userEntity, password);
+    userEntity.HashedPassword = PasswordHashing.HashPassword(userEntity, password);
 
     db.Users.Add(userEntity);
     await db.SaveChangesAsync();
@@ -555,7 +564,7 @@ static async Task<IResult> RegisterUser(RegisterUserDto registerUserDto, Workout
     return TypedResults.Created("/auth/register", registerUserDto);
 }
 
-
+// Endpoint handler method for logging in a user
 static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db, IOptions<JwtOptions> jwtOptions)
 {
     if(string.IsNullOrWhiteSpace(loginUserDto.Username) || string.IsNullOrWhiteSpace(loginUserDto.Password))
@@ -570,12 +579,12 @@ static async Task<IResult> LoginUser(LoginUserDto loginUserDto, WorkoutsDb db, I
     // Registered User does not exist
     if(registeredUser is null) return TypedResults.BadRequest("Username does not exist");
 
-    var registeredUserPassword = registeredUser.PasswordHash;
+    var registeredUserPassword = registeredUser.HashedPassword;
 
     var isPasswordValid = PasswordHashing.VerifyPassword(registeredUserPassword,
                                                 loginUserDto.Password);
 
-    // If the result is true implement jwt if the result is false then return incorrect password to user
+    // If the user password does not match stored password return 401 unauthorized
     if(!isPasswordValid) return TypedResults.Unauthorized();
 
     // Generate Jwt Token

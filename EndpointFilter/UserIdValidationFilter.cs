@@ -9,7 +9,8 @@ public class UserIdValidationFilter : IEndpointFilter
 {
     public async ValueTask<object> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        // Try to read "userId" from route values
+        // Try to read "userId" from route values which will include the jwt token
+        // If the userId is null or cannot be converted / parsed into an int we return a badRequest object
         if (!context.HttpContext.Request.RouteValues.TryGetValue("userId", out var idObj) ||
             idObj is null ||
             !int.TryParse(idObj.ToString(), out var userId))
